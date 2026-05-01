@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atelier JATV - Simulador Master</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style>
+        :root {
+            --bg-main: #1a1a1a;
+            --bg-panel: #222;
+            --accent-gold: #ffc107;
+            --danger-red: #d32f2f;
+            --highlight-color: #00ffea; 
+            --text-main: #e0e0e0;
+            --text-muted: #aaaaaa;
+            --border: #444;
+            --chat-bg: #2a2a2a;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            min-height: 100vh;
+            overflow-y: auto; 
+            display: flex; flex-direction: column;
+        }
+
+        /* HEADER */
+        header { 
+            display: flex; justify-content: space-between; align-items: center; 
+            padding: 15px 30px; border-bottom: 1px solid var(--border); background: #151515;
+            flex-wrap: wrap; gap: 15px;
+        }
+        .brand-area h1 { font-family: 'Playfair Display', serif; color: var(--accent-gold); margin: 0; font-size: 1.8rem; }
+        .brand-area p { color: var(--text-muted); font-size: 0.85rem; margin-top: 5px; letter-spacing: 0.5px; }
+        .header-controls { display: flex; gap: 10px; }
+
+        /* LAYOUT */
+        .workspace {
+            display: grid;
+            grid-template-columns: 300px 1fr 340px; /* Panel derecho un poco más ancho para el chat */
+            gap: 20px; padding: 20px; align-items: start;
+            height: calc(100vh - 90px); min-height: 600px;
+        }
+
+        @media (max-width: 1200px) {
+            .workspace { grid-template-columns: 1fr; height: auto; }
+            .panel { margin-bottom: 20px; }
+            .canvas-area { grid-row: 1; height: 500px; }
+            .left-panel { grid-row: 2; }
+            .right-panel { grid-row: 3; }
+            header { flex-direction: column; text-align: center; }
+        }
+
+        /* PANELES */
+        .panel {
+            background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px;
+            display: flex; flex-direction: column; height: auto; max-height: 100%; overflow-y: auto;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        .panel-header {
+            padding: 15px; background: #2a2a2a; border-bottom: 1px solid var(--border);
+            font-weight: bold; color: var(--accent-gold); font-family: 'Playfair Display', serif;
+            font-size: 1.1rem; border-radius: 8px 8px 0 0; position: sticky; top: 0; z-index: 10;
+        }
+        .content-box { padding: 20px; }
+
+        /* CONTROLES */
+        .control-group { margin-bottom: 25px; }
+        .control-group label { display: block; font-size: 0.9rem; color: var(--text-muted); margin-bottom: 10px; font-weight: 500; }
+        input[type="range"], input[type="number"], input[type="color"] { width: 100%; background: #333; border: 1px solid #555; color: white; padding: 8px; border-radius: 4px; }
+        
+        .btn {
+            background: #333; color: white; border: 1px solid #555; padding: 10px; border-radius: 6px; cursor: pointer;
+            width: 100%; margin-bottom: 10px; font-weight: 500; transition: 0.2s; display: flex; justify-content: center; gap: 8px; align-items: center;
+        }
+        .btn:hover { background: #444; border-color: #777; }
+        .btn-primary { background: var(--accent-gold); color: #1a1a1a; border: none; font-weight: bold; }
+        .btn-primary:hover { background: #e0a800; transform: translateY(-1px); }
+        .btn-danger { background: var(--danger-red); border: none; font-weight: bold; }
+        .btn-danger:hover { background: #b71c1c; }
+        
+        /* BOTONES PEQUEÑOS EN TARJETAS */
+        .card-actions { display: flex; gap: 5px; margin-top: 10px; }
+        .btn-sm { font-size: 0.75rem; padding: 6px 10px; border: 1px solid #555; background: transparent; color: #ccc; flex: 1; }
+        .btn-sm:hover { background: #444; color: white; }
+        .btn-locate.active { background: var(--accent-gold); color: black; border-color: var(--accent-gold); }
+        .btn-chat { border-color: #4a90e2; color: #4a90e2; }
+        .btn-chat:hover { background: #4a90e2; color: white; }
+
+        /* CANVAS AREA */
+        .canvas-area {
+            background: #0a0a0a; height: 100%; border-radius: 8px; border: 1px solid var(--border);
+            position: relative; overflow: hidden; display: flex; justify-content: center; align-items: center;
+            cursor: grab; box-shadow: inset 0 0 50px rgba(0,0,0,0.5);
+        }
+        .canvas-area:active { cursor: grabbing; }
+        #transformContainer { position: relative; transform-origin: center center; transition: transform 0.1s linear; }
+        #mainImage { display: block; max-width: none; pointer-events: none; }
+        #highlightOverlay, #gridOverlay { position: absolute; top: 0; left: 0; pointer-events: none; }
+        #highlightOverlay { mix-blend-mode: normal; opacity: 0.85; }
+        .placeholder { position: absolute; text-align: center; color: var(--text-muted); pointer-events: none; }
+        .placeholder i { font-size: 4em; display: block; margin-bottom: 15px; opacity: 0.3; }
+
+        /* RESULTADOS Y CHAT */
+        .wheel-container {
+            display: flex; justify-content: center; margin-bottom: 20px; background: #111; padding: 15px; border-radius: 50%;
+            width: 200px; height: 200px; margin: 0 auto 15px auto; border: 2px solid #333;
+        }
+        .analysis-card {
+            background: rgba(255,255,255,0.05); border-left: 4px solid var(--accent-gold); padding: 12px; margin-bottom: 12px; border-radius: 0 6px 6px 0;
+        }
+        .color-row { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; }
+        .swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); }
+        .recipe-block { background: rgba(0,0,0,0.3); padding: 8px; border-radius: 4px; margin-top: 5px; border: 1px dashed #444; font-size: 0.85rem; color: #ddd;}
+
+        /* NUEVO: CHAT INTERFACE */
+        .chat-section {
+            margin-top: 20px; border-top: 1px solid var(--border); padding-top: 15px;
+            background: var(--chat-bg); border-radius: 8px; padding: 15px;
+        }
+        .chat-display {
+            height: 150px; overflow-y: auto; background: #111; border: 1px solid #333; border-radius: 4px; padding: 10px; margin-bottom: 10px;
+            font-size: 0.9rem; color: #ccc;
+        }
+        .chat-msg { margin-bottom: 8px; line-height: 1.4; }
+        .chat-msg.bot { color: var(--accent-gold); }
+        .chat-msg.user { color: #4a90e2; text-align: right; font-style: italic; }
+        
+        .chat-input-area { display: flex; gap: 5px; }
+        #chatInput { flex: 1; background: #333; border: 1px solid #555; padding: 8px; color: white; border-radius: 4px; }
+        #btnSendChat { width: auto; margin: 0; padding: 0 15px; background: #4a90e2; border: none; }
+        #btnSendChat:hover { background: #357abd; }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand-area">
+            <h1>🎨 Atelier JATV</h1>
+            <p>Simulador técnico y Asistente de Mezcla para Óleo</p>
+        </div>
+        <div class="header-controls">
+            <input type="file" id="fileInput" hidden accept="image/*">
+            <button class="btn btn-danger" id="btnClear" title="Reiniciar App">🗑️ Reiniciar</button>
+            <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">📂 Cargar Imagen</button>
+        </div>
+    </header>
+
+    <div class="workspace">
+        
+        <div class="panel left-panel">
+            <div class="panel-header">Herramientas</div>
+            <div class="content-box">
+                <div class="control-group">
+                    <label>🔍 Zoom</label>
+                    <input type="range" id="zoomRange" min="0.05" max="3" step="0.05" value="1">
+                    <button class="btn" id="btnResetView" style="margin-top:8px; font-size: 0.8em; padding: 6px;">Centrar Vista</button>
+                </div>
+                <hr style="border-top: 1px solid var(--border); margin: 20px 0;">
+                <div class="control-group">
+                    <label>📐 Cuadrícula</label>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="number" id="gridDivs" value="3" min="1" max="50" style="width: 80px;">
+                        <span>divisiones</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>Estilo</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="color" id="gridColor" value="#00FF00" style="height: 40px; cursor: pointer;">
+                        <input type="range" id="gridThick" min="1" max="10" value="2">
+                    </div>
+                </div>
+                <button class="btn" id="btnToggleGrid">👁️ Ocultar/Ver Cuadrícula</button>
+                <button class="btn" id="btnToggleGray">🌗 Escala de Grises</button>
+                <button class="btn" id="btnToggleOutline">📝 Modo Plantilla</button>
+                <button class="btn" id="btnToggleMirror">🪞 Efecto Espejo</button>
+                <hr style="border-top: 1px solid var(--border); margin: 25px 0;">
+                <label style="color: var(--accent-gold); font-weight:bold; margin-bottom:10px; display:block;">⬇ DESCARGAS</label>
+                <button class="btn" id="btnDlPdf">📄 Descargar PDF</button>
+                <button class="btn" id="btnDlPng">💾 Descargar PNG</button>
+            </div>
+        </div>
+
+        <div class="canvas-area" id="viewport">
+            <div class="placeholder" id="placeholder">
+                <i>🖼️</i>
+                <p>Sube una imagen para analizar</p>
+                <p style="font-size:0.8em; color:#666;">(Haz clic en 'Cargar Imagen')</p>
+            </div>
+            
+            <div id="transformContainer" style="display:none;">
+                <img id="mainImage">
+                <canvas id="highlightOverlay"></canvas>
+                <canvas id="gridOverlay"></canvas>
+                <canvas id="outlineOverlay" style="position: absolute; top: 0; left: 0; pointer-events: none; display: none;"></canvas>
+            </div>
+        </div>
+
+        <div class="panel right-panel">
+            <div class="panel-header">Color & Asistente</div>
+            <div class="content-box">
+                <div style="text-align: center;">
+                    <canvas id="wheelCanvas" width="200" height="200" style="border-radius: 50%;"></canvas>
+                </div>
+
+                <div id="analysisResults" style="margin-top: 20px; max-height: 300px; overflow-y: auto; padding-right: 5px;">
+                    <p style="text-align: center; color: #666; font-size: 0.9em;">Esperando imagen...</p>
+                </div>
+
+                <div class="chat-section" id="chatSection" style="display:none;">
+                    <label style="color: var(--accent-gold); font-size:0.9em; margin-bottom:5px;">💬 Asistente de Mezcla</label>
+                    <div class="chat-display" id="chatDisplay">
+                        <div class="chat-msg bot">Hola, selecciona un color arriba y pregúntame cómo obtenerlo con tus tubos.</div>
+                    </div>
+                    <div class="chat-input-area">
+                        <input type="text" id="chatInput" placeholder="Ej: tengo Ocre, ¿me sirve?">
+                        <button class="btn" id="btnSendChat">Enviar</button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+<script>
+    // --- BASE DE DATOS DE PIGMENTOS CON SUS VALORES ---
+    const OIL_PAINTS = [
+        { name: "Blanco Titanio", r:250, g:250, b:250 }, 
+        { name: "Negro Marfil", r:30, g:30, b:30 },
+        { name: "Amarillo Cadmio", r:255, g:230, b:0 }, 
+        { name: "Ocre Amarillo", r:204, g:153, b:51 },
+        { name: "Siena Natural", r:200, g:120, b:60 },
+        { name: "Raw Sienna", r:199, g:116, b:52 }, // Sinonimo ingles
+        { name: "Rojo Cadmio", r:227, g:0, b:34 }, 
+        { name: "Carmesí Alizarina", r:145, g:30, b:50 },
+        { name: "Azul Ultramar", r:18, g:10, b:143 }, 
+        { name: "Azul Cobalto", r:0, g:71, b:171 },
+        { name: "Azul Cerúleo", r:42, g:82, b:190 },
+        { name: "Siena Tostada", r:105, g:60, b:40 }, 
+        { name: "Burnt Sienna", r:105, g:60, b:40 }, // Sinonimo ingles
+        { name: "Sombra Tostada", r:50, g:30, b:20 },
+        { name: "Burnt Umber", r:50, g:30, b:20 }, // Sinonimo ingles
+        { name: "Verde Vejiga", r:80, g:120, b:40 }, 
+        { name: "Verde Viridian", r:0, g:100, b:60 },
+        { name: "Tierra Verde", r:90, g:110, b:80 },
+        { name: "Naranja Cadmio", r:255, g:140, b:0 },
+        // --- ADICIONES: MARIE'S Y HUILE (Pébéo/Lefranc) ---
+        { name: "Blanco de Zinc", r:245, g:245, b:250 }, // Más transparente y frío que el titanio
+        { name: "Amarillo Limón", r:255, g:240, b:0 }, // Muy común en sets de Marie's
+        { name: "Amarillo Nápoles", r:250, g:218, b:94 }, // Clásico de Huile
+        { name: "Bermellón", r:227, g:66, b:52 }, // Vermilion, clásico de Marie's
+        { name: "Rosa Madder", r:227, g:38, b:54 }, // Rose Madder / Laca Rosa
+        { name: "Magenta Primario", r:255, g:0, b:144 }, // Tonos CMYK modernos
+        { name: "Cian Primario", r:0, g:174, b:239 }, // Tonos CMYK modernos
+        { name: "Azul Ftalocianina", r:0, g:15, b:137 }, // Phthalo Blue
+        { name: "Azul de Prusia", r:0, g:49, b:83 }, // Prussian Blue (Muy oscuro y dominante)
+        { name: "Violeta Dioxazina", r:88, g:42, b:114 }, // Muy común en Pébéo Huile
+        { name: "Gris de Payne", r:83, g:104, b:120 }, // Payne's Gray
+        { name: "Verde Esmeralda", r:80, g:200, b:120 }, // Emerald Green de Marie's
+        { name: "Marrón Vandyke", r:65, g:53, b:32 }, // Vandyke Brown
+        { name: "Tono Piel", r:255, g:204, b:153 }, // Flesh Tint
+        { name: "Negro de Marte", r:40, g:36, b:34 }, // Mars Black (Más cálido que el marfil)
+        { name: "Sap Green", r:80, g:120, b:40 }, 
+        { name: "Ultramarine Blue", r:18, g:10, b:143 }, 
+        { name: "Chinese White", r:245, g:245, b:250 }, 
+        { name: "Yellow Pale", r:255, g:245, b:150 }
+    ];
+
+    const dom = {
+        viewport: document.getElementById('viewport'),
+        container: document.getElementById('transformContainer'),
+        img: document.getElementById('mainImage'),
+        gridCanvas: document.getElementById('gridOverlay'),
+        highlightCanvas: document.getElementById('highlightOverlay'),
+        wheelCanvas: document.getElementById('wheelCanvas'),
+        placeholder: document.getElementById('placeholder'),
+        results: document.getElementById('analysisResults'),
+        fileInput: document.getElementById('fileInput'),
+        zoomRange: document.getElementById('zoomRange'),
+        gridDivs: document.getElementById('gridDivs'),
+        gridColor: document.getElementById('gridColor'),
+        gridThick: document.getElementById('gridThick'),
+        btnReset: document.getElementById('btnResetView'),
+        btnGrid: document.getElementById('btnToggleGrid'),
+        btnGray: document.getElementById('btnToggleGray'),
+        btnPdf: document.getElementById('btnDlPdf'),
+        btnPng: document.getElementById('btnDlPng'),
+        btnClearApp: document.getElementById('btnClear'),
+        outlineCanvas: document.getElementById('outlineOverlay'),
+        btnOutline: document.getElementById('btnToggleOutline'),
+        btnMirror: document.getElementById('btnToggleMirror'),
+        // CHAT DOM
+        chatSection: document.getElementById('chatSection'),
+        chatDisplay: document.getElementById('chatDisplay'),
+        chatInput: document.getElementById('chatInput'),
+        btnSendChat: document.getElementById('btnSendChat')
+    };
+
+    let state = {
+        isOutline: false, isMirror: false,
+        scale: 1, panning: false, pointX: 0, pointY: 0, startX: 0, startY: 0,
+        isGridVisible: true, isGray: false,
+        activeHighlight: null,
+        activeColorContext: null // Guardará el color sobre el que el usuario quiere preguntar
+    };
+
+    // --- SETUP INICIAL ---
+    drawColorWheel([]); 
+    dom.fileInput.onchange = (e) => loadFile(e.target.files[0]);
+    [dom.gridDivs, dom.gridColor, dom.gridThick].forEach(el => el.oninput = drawGrid);
+
+    // --- CHAT LOGIC ---
+    dom.btnSendChat.onclick = () => handleChat();
+    dom.chatInput.onkeypress = (e) => { if(e.key === 'Enter') handleChat(); };
+
+    function activateChat(colorName, r, g, b) {
+        state.activeColorContext = { name: colorName, r, g, b };
+        dom.chatSection.style.display = 'block';
+        addBotMessage(`Hablemos del color detectado: <strong>${colorName}</strong>.<br>¿Qué tubo tienes a mano para intentar conseguirlo? (Ej: escribe "Raw Sienna" o "Ocre")`);
+        dom.chatInput.focus();
+    }
+
+    function handleChat() {
+        const text = dom.chatInput.value.trim();
+        if(!text) return;
+        
+        addUserMessage(text);
+        dom.chatInput.value = '';
+
+        if(!state.activeColorContext) {
+            addBotMessage("Por favor, selecciona primero un color de la lista superior pulsando el botón '💬 Consultar'.");
+            return;
+        }
+
+        // INTELIGENCIA DE MEZCLA
+        // 1. Buscar si el usuario mencionó un color conocido
+        const userTube = findTubeByName(text);
+        
+        if(!userTube) {
+            addBotMessage(`No reconozco el color "${text}" en mi base de datos de óleos estándar. Intenta con nombres comunes como "Ocre", "Siena", "Cadmio", "Ultramar".`);
+        } else {
+            compareAndAdvise(userTube, state.activeColorContext);
+        }
+    }
+
+    function findTubeByName(input) {
+        const lower = input.toLowerCase();
+        return OIL_PAINTS.find(p => p.name.toLowerCase().includes(lower));
+    }
+
+    function compareAndAdvise(userTube, targetColor) {
+     // Convertir ambos a HSL para comparar humanamente
+        const userHSL = rgbToHsl(userTube.r, userTube.g, userTube.b);
+        const targetHSL = rgbToHsl(targetColor.r, targetColor.g, targetColor.b);
+
+        let pBase = 100, pWhite = 0, pDark = 0, pAdj = 0;
+        let adjName = "";
+
+    // 1. Diferencia de Luz (L) -> Determina porcentaje de Blanco o Sombra/Negro
+        const diffL = targetHSL.l - userHSL.l;
+        if (diffL > 5) {
+        pWhite = Math.min(80, diffL * 1.5); // Escala para calcular cantidad de blanco
+        } else if (diffL < -5) {
+        pDark = Math.min(50, Math.abs(diffL) * 1.2); // Escala para oscurecer
+        }
+
+    // 2. Diferencia de Matiz (H) -> Determina si hay que virar el color
+        let diffH = targetHSL.h - userHSL.h;
+        if (diffH > 180) diffH -= 360;
+     if (diffH < -180) diffH += 360;
+
+        if (Math.abs(diffH) > 10) {
+        pAdj = Math.min(35, Math.abs(diffH) * 0.6); // Escala de ajuste de matiz
+        if (userHSL.h >= 30 && userHSL.h < 60) { // Amarillos/Ocre
+        adjName = diffH > 0 ? "Azul / Verde (para enfriar)" : "Rojo / Siena (para calentar)";
+        } else if (userHSL.h >= 0 && userHSL.h < 30) { // Rojos/Naranjas
+        adjName = diffH > 0 ? "Amarillo / Ocre" : "Azul (para agrisar/violáceo)";
+         } else {
+        adjName = diffH > 0 ? "Color adyacente (frío)" : "Color adyacente (cálido)";
+        }
+}
+
+    // 3. Calcular la Base restando los modificadores
+    pBase = Math.max(10, 100 - pWhite - pDark - pAdj); 
+
+    // 4. Normalizar para que todo sume exactamente 100%
+    let total = pBase + pWhite + pDark + pAdj;
+    pBase = Math.round((pBase / total) * 100);
+    pWhite = Math.round((pWhite / total) * 100);
+    pDark = Math.round((pDark / total) * 100);
+    pAdj = Math.round((pAdj / total) * 100);
+
+    // Ajuste final por problemas de redondeo matemático
+    let sum = pBase + pWhite + pDark + pAdj;
+    if (sum !== 100) pBase += (100 - sum);
+
+    // 5. Construir la respuesta en HTML
+    let advice = `Para obtener <strong>${targetColor.name}</strong> a partir de tu <strong>${userTube.name}</strong>, intenta esta proporción:<br><br>`;
+
+    advice += `<div style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 6px; border: 1px solid #444; font-size: 0.95rem;">`;
+
+    if (pBase > 0) advice += `<div style="margin-bottom: 6px;">🎨 <strong>${pBase}%</strong> - ${userTube.name} (Base)</div>`;
+    if (pWhite > 0) advice += `<div style="margin-bottom: 6px;">⚪ <strong>${pWhite}%</strong> - Blanco Titanio</div>`;
+    if (pDark > 0) advice += `<div style="margin-bottom: 6px;">⚫ <strong>${pDark}%</strong> - Sombra Tostada o Negro</div>`;
+    if (pAdj > 0) advice += `<div style="margin-bottom: 6px;">🌈 <strong>${pAdj}%</strong> - ${adjName}</div>`;
+ 
+        advice += `</div>`;
+
+    if (pBase >= 95) {
+    advice = `¡Son prácticamente el mismo color! Usa tu <strong>${userTube.name}</strong> puro directamente (100%).`;
+    }
+
+    addBotMessage(advice);
+}
+
+    function addBotMessage(html) {
+        const d = document.createElement('div');
+        d.className = 'chat-msg bot';
+        d.innerHTML = "🤖 " + html;
+        dom.chatDisplay.appendChild(d);
+        dom.chatDisplay.scrollTop = dom.chatDisplay.scrollHeight;
+    }
+
+    function addUserMessage(text) {
+        const d = document.createElement('div');
+        d.className = 'chat-msg user';
+        d.textContent = text;
+        dom.chatDisplay.appendChild(d);
+        dom.chatDisplay.scrollTop = dom.chatDisplay.scrollHeight;
+    }
+
+
+    // --- FUNCTIONALITY CORE ---
+    dom.btnClearApp.onclick = () => {
+        dom.img.src = ""; dom.container.style.display = 'none'; dom.placeholder.style.display = 'block';
+        dom.fileInput.value = ""; drawColorWheel([]); dom.results.innerHTML = '<p style="text-align: center; color: #666; font-size: 0.9em;">Esperando imagen...</p>';
+        state.activeHighlight = null; clearHighlight(); state.scale = 1; state.pointX = 0; state.pointY = 0; dom.zoomRange.value = 1;
+        state.isGray = false; dom.img.style.filter = "none";
+        dom.chatSection.style.display = 'none'; // Ocultar chat
+    };
+
+    dom.zoomRange.oninput = (e) => { state.scale = parseFloat(e.target.value); updateTransform(); };
+    dom.btnReset.onclick = () => fitToScreen();
+    dom.viewport.onmousedown = (e) => { e.preventDefault(); state.panning = true; state.startX = e.clientX - state.pointX; state.startY = e.clientY - state.pointY; dom.viewport.style.cursor = 'grabbing'; };
+    window.onmousemove = (e) => { if(!state.panning) return; e.preventDefault(); state.pointX = e.clientX - state.startX; state.pointY = e.clientY - state.startY; updateTransform(); };
+    window.onmouseup = () => { state.panning = false; dom.viewport.style.cursor = 'grab'; };
+    function updateTransform() { 
+            if(dom.container.style.display !== 'none') {
+                const mirrorScale = state.isMirror ? -1 : 1;
+                dom.container.style.transform = `translate(${state.pointX}px, ${state.pointY}px) scale(${state.scale}) scaleX(${mirrorScale})`; 
+            }
+    }
+
+    function loadFile(file) {
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            dom.img.src = e.target.result;
+            dom.img.onload = () => {
+                dom.placeholder.style.display = 'none'; dom.container.style.display = 'block';
+                [dom.gridCanvas, dom.highlightCanvas, dom.outlineCanvas].forEach(c => { c.width = dom.img.naturalWidth; c.height = dom.img.naturalHeight; c.style.width = dom.img.naturalWidth + 'px'; c.style.height = dom.img.naturalHeight + 'px'; });
+                fitToScreen(); drawGrid(); analyzeImage();
+                // Limpiar chat anterior
+                dom.chatDisplay.innerHTML = '<div class="chat-msg bot">Hola, selecciona un color arriba y pregúntame cómo obtenerlo con tus tubos.</div>';
+            };
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function fitToScreen() {
+        if (dom.img.naturalWidth === 0) return;
+        const sX = dom.viewport.clientWidth / dom.img.naturalWidth;
+        const sY = dom.viewport.clientHeight / dom.img.naturalHeight;
+        let newScale = Math.min(sX, sY) * 0.95; 
+        state.scale = newScale; state.pointX = 0; state.pointY = 0; dom.zoomRange.value = newScale; updateTransform();
+    }
+
+    function drawGrid() {
+        if (!dom.img.src) return;
+        const ctx = dom.gridCanvas.getContext('2d');
+        const w = dom.gridCanvas.width; const h = dom.gridCanvas.height;
+        ctx.clearRect(0, 0, w, h);
+        if (!state.isGridVisible) return;
+        ctx.strokeStyle = dom.gridColor.value;
+        ctx.lineWidth = parseInt(dom.gridThick.value) * (Math.max(w, h) / 1000);
+        ctx.beginPath();
+        const divs = parseInt(dom.gridDivs.value);
+        for (let i = 1; i < divs; i++) { ctx.moveTo(i * (w/divs), 0); ctx.lineTo(i * (w/divs), h); ctx.moveTo(0, i * (h/divs)); ctx.lineTo(w, i * (h/divs)); }
+        ctx.stroke(); ctx.strokeRect(0,0,w,h);
+    }
+    dom.btnGrid.onclick = () => { state.isGridVisible = !state.isGridVisible; drawGrid(); };
+    dom.btnGray.onclick = () => { state.isGray = !state.isGray; dom.img.style.filter = state.isGray ? "grayscale(100%)" : "none"; };
+
+    function analyzeImage() {
+        const c = document.createElement('canvas'); const ctx = c.getContext('2d');
+        c.width = 250; c.height = 250; ctx.drawImage(dom.img, 0, 0, c.width, c.height);
+        const data = ctx.getImageData(0,0,c.width,c.height).data;
+        const map = {}; const quantization = 15;
+
+        // 1. Escanear píxeles
+        for(let i=0; i<data.length; i+=12) { 
+            if(data[i+3]<128) continue;
+            const r=Math.round(data[i]/quantization)*quantization; 
+            const g=Math.round(data[i+1]/quantization)*quantization;
+            const b=Math.round(data[i+2]/quantization)*quantization;
+            const k = `${r},${g},${b}`;
+            
+            if(!map[k]) map[k] = {r,g,b, count:0};
+            
+            // NUEVO TRUCO: Darle más "puntos" a los colores vivos para que le ganen a la oscuridad
+            const max = Math.max(r,g,b);
+            const min = Math.min(r,g,b);
+            // Si el color tiene contraste entre sus canales (no es gris) y no es negro puro...
+            const isColorful = (max - min) > 20 && max > 40; 
+            
+            // Le damos 6 puntos a los colores vivos y solo 1 punto a las sombras/grises
+            map[k].count += isColorful ? 6 : 1; 
+        }
+        
+        let candidates = Object.values(map).sort((a,b)=>b.count-a.count);
+        const finalColors = [];
+        const diversityThreshold = 65; 
+
+        // 2. Seleccionar los 6 mejores asegurando que sean diferentes entre sí
+        for (let cand of candidates) {
+            if (finalColors.length >= 6) break;
+            let isDistinct = true;
+            for (let existing of finalColors) {
+                // Usamos la fórmula Redmean aquí también para que no agrupe el verde oscuro con el negro
+                const rmean = (cand.r + existing.r) / 2;
+                const dR = cand.r - existing.r;
+                const dG = cand.g - existing.g;
+                const dB = cand.b - existing.b;
+                const dist = Math.sqrt((((512+rmean)*dR*dR)>>8) + 4*dG*dG + (((767-rmean)*dB*dB)>>8));
+                
+                if (dist < diversityThreshold) { isDistinct = false; break; }
+            }
+            if (isDistinct) finalColors.push(cand);
+        }
+
+        const processedColors = finalColors.map(c => ({...c, hsl: rgbToHsl(c.r,c.g,c.b)}));
+        drawColorWheel(processedColors);
+        renderAdvice(processedColors);
+    }
+
+    function findClosestTube(c) {
+        let best = OIL_PAINTS[0]; let minDist = Infinity;
+        OIL_PAINTS.forEach(p => {
+            const rmean = (c.r + p.r) / 2;
+            const dR = c.r - p.r; const dG = c.g - p.g; const dB = c.b - p.b;
+            const dist = Math.sqrt((((512+rmean)*dR*dR)>>8) + 4*dG*dG + (((767-rmean)*dB*dB)>>8));
+            if(dist < minDist){ minDist = dist; best = p; }
+        });
+        return best;
+    }
+
+    function getSmartRecipe(hsl, tubeName) {
+        let instructions = [];
+        if (hsl.l > 85) instructions.push("Mucho Blanco");
+        else if (hsl.l > 60) instructions.push("Aclarar con Blanco");
+        else if (hsl.l < 25) instructions.push("Oscurecer (Sombra Tostada)");
+        if (hsl.s < 20) instructions.push("Grisáceo (Desaturar)");
+        else if (hsl.s > 60) instructions.push("Puro/Intenso");
+        return `Base: ${tubeName}. ${instructions.join(". ")}.`;
+    }
+
+    function renderAdvice(colors) {
+        dom.results.innerHTML = '';
+        colors.forEach((c, index) => {
+            const tube = findClosestTube(c);
+            const recipe = getSmartRecipe(c.hsl, tube.name);
+
+            const div = document.createElement('div');
+            div.className = 'analysis-card';
+            div.innerHTML = `
+                <div class="color-row">
+                    <div class="swatch" style="background:rgb(${c.r},${c.g},${c.b})"></div>
+                    <div><strong style="color:white; font-size:0.95rem;">${tube.name}</strong></div>
+                </div>
+                <div class="recipe-block">${recipe}</div>
+                <div class="card-actions">
+                    <button class="btn-sm btn-locate" onclick="toggleHighlight(${c.r},${c.g},${c.b}, this)">📍 Ubicar</button>
+                    <button class="btn-sm btn-chat" onclick="activateChat('${tube.name}', ${c.r}, ${c.g}, ${c.b})">💬 Consultar</button>
+                </div>
+            `;
+            dom.results.appendChild(div);
+        });
+    }
+
+    function toggleHighlight(r, g, b, btnElement) {
+        document.querySelectorAll('.btn-locate').forEach(b => b.classList.remove('active'));
+        const id = `${r},${g},${b}`;
+        if (state.activeHighlight === id) { clearHighlight(); state.activeHighlight = null; return; }
+        state.activeHighlight = id; btnElement.classList.add('active'); highlightPixels(r, g, b);
+    }
+
+    function clearHighlight() { const ctx = dom.highlightCanvas.getContext('2d'); ctx.clearRect(0, 0, dom.highlightCanvas.width, dom.highlightCanvas.height); }
+
+   function highlightPixels(tr, tg, tb) {
+    clearHighlight();
+    const ctx = dom.highlightCanvas.getContext('2d'); 
+    const w = dom.highlightCanvas.width; 
+    const h = dom.highlightCanvas.height;
+    const tempC = document.createElement('canvas'); tempC.width = w; tempC.height = h;
+    const tempCtx = tempC.getContext('2d'); tempCtx.drawImage(dom.img, 0, 0, w, h);
+    const data = tempCtx.getImageData(0, 0, w, h).data;
+    const targetData = ctx.createImageData(w, h); 
+    const output = targetData.data;
+    
+    // Calculamos la luz real del color que el usuario quiere ubicar
+    const targetLuma = 0.299 * tr + 0.587 * tg + 0.114 * tb;
+    
+    // Valores por defecto (moderados, no gigantes como el 180 de antes)
+    let tolerance = 85; 
+    let lumaLimit = 60; // Diferencia de luz máxima permitida
+
+    // Si el color a buscar es una sombra profunda...
+    if (targetLuma < 50) {
+        tolerance = 45; // Somos estrictos con el color
+        lumaLimit = 30; // ¡Y súper estrictos con la luz! No puede tocar zonas claras
+    }
+
+    for (let i = 0; i < data.length; i += 4) {
+        const r = data[i], g = data[i+1], b = data[i+2];
+        
+        // 1. FILTRO DE LUZ RÁPIDO:
+        // Calculamos la luz del píxel actual de la imagen
+        const pixelLuma = 0.299 * r + 0.587 * g + 0.114 * b;
+        // Si la luz del píxel es muy distinta a la luz de nuestro objetivo, lo ignoramos
+        if (Math.abs(targetLuma - pixelLuma) > lumaLimit) continue;
+
+        // 2. FÓRMULA DE COLOR: (Solo llega aquí si pasó la prueba de luz)
+        const rmean = (tr + r) / 2;
+        const dR = tr - r;
+        const dG = tg - g;
+        const dB = tb - b;
+        const dist = Math.sqrt((((512+rmean)*dR*dR)>>8) + 4*dG*dG + (((767-rmean)*dB*dB)>>8));
+
+        if (dist < tolerance) { 
+            output[i] = 0; 
+            output[i+1] = 255; 
+            output[i+2] = 234; 
+            output[i+3] = 180; 
+        }
+    }
+    ctx.putImageData(targetData, 0, 0);
+}
+
+    function drawColorWheel(points) {
+        const ctx = dom.wheelCanvas.getContext('2d'); const w=200, h=200, cx=100, cy=100, r=90;
+        ctx.clearRect(0,0,w,h);
+        for(let i=0; i<360; i++) {
+            const rad = i*Math.PI/180; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,r,rad,rad+0.02); ctx.fillStyle = `hsl(${i}, 100%, 50%)`; ctx.fill();
+        }
+        const gr = ctx.createRadialGradient(cx,cy,0,cx,cy,r); gr.addColorStop(0, '#555'); gr.addColorStop(1, 'transparent'); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+        points.forEach(p => {
+            const ang = p.hsl.h * Math.PI/180; const dist = (p.hsl.s/100) * r;
+            const px = cx + Math.cos(ang)*dist; const py = cy + Math.sin(ang)*dist;
+            ctx.beginPath(); ctx.arc(px,py,5,0,Math.PI*2); ctx.fillStyle = `rgb(${p.r},${p.g},${p.b})`; ctx.strokeStyle='white'; ctx.lineWidth=2; ctx.fill(); ctx.stroke();
+        });
+    }
+
+    function getMergedCanvas() {
+        const c = document.createElement('canvas'); c.width = dom.img.naturalWidth; c.height = dom.img.naturalHeight; const ctx = c.getContext('2d');
+        if(state.isGray) ctx.filter = 'grayscale(100%)'; ctx.drawImage(dom.img, 0, 0); ctx.filter = 'none';
+        if(state.isGridVisible) {
+            const divs = parseInt(dom.gridDivs.value); ctx.strokeStyle = dom.gridColor.value; ctx.lineWidth = parseInt(dom.gridThick.value) * (Math.max(c.width, c.height) / 1000);
+            ctx.beginPath(); const sX = c.width/divs, sY = c.height/divs;
+            for (let i = 1; i < divs; i++) { ctx.moveTo(i*sX,0); ctx.lineTo(i*sX,c.height); ctx.moveTo(0,i*sY); ctx.lineTo(c.width,i*sY); }
+            ctx.stroke(); ctx.strokeRect(0,0,c.width, c.height);
+        }
+        return c;
+    }
+    // --- LÓGICA DE PLANTILLA (CONTORNOS) ---
+  function generateOutline() {
+    const c = dom.outlineCanvas; const ctx = c.getContext('2d');
+    const w = c.width; const h = c.height;
+    ctx.drawImage(dom.img, 0, 0, w, h);
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const data = imgData.data; const temp = new Uint8ClampedArray(data);
+
+    const getLuma = (x, y) => {
+      if(x<0 || x>=w || y<0 || y>=h) return 255;
+      const i = (y*w + x)*4;
+      return 0.299*temp[i] + 0.587*temp[i+1] + 0.114*temp[i+2];
+    };
+
+    // Algoritmo de detección de bordes
+    for(let y=0; y<h; y++) {
+      for(let x=0; x<w; x++) {
+        const luma = getLuma(x,y);
+        const lumaR = getLuma(x+1, y);
+        const lumaB = getLuma(x, y+1);
+        
+        const diff = Math.abs(luma - lumaR) + Math.abs(luma - lumaB);
+        const color = diff > 15 ? 0 : 255; // Blanco y Negro puro
+        
+        const idx = (y*w + x)*4;
+        data[idx] = color; data[idx+1] = color; data[idx+2] = color; data[idx+3] = 255;
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+  }
+
+  dom.btnOutline.onclick = () => {
+    state.isOutline = !state.isOutline;
+    dom.btnOutline.style.background = state.isOutline ? 'var(--accent-gold)' : '#333';
+    dom.btnOutline.style.color = state.isOutline ? 'black' : 'white';
+
+    if(state.isOutline) {
+      dom.img.style.opacity = '0'; // Ocultamos la foto original
+      dom.outlineCanvas.style.display = 'block';
+      generateOutline();
+    } else {
+      dom.img.style.opacity = '1';
+      dom.outlineCanvas.style.display = 'none';
+    }
+  };
+
+  dom.btnMirror.onclick = () => {
+    state.isMirror = !state.isMirror;
+    dom.btnMirror.style.background = state.isMirror ? 'var(--accent-gold)' : '#333';
+    dom.btnMirror.style.color = state.isMirror ? 'black' : 'white';
+    updateTransform();
+  };
+
+  // IMPORTANTE: Reemplazar tu función getMergedCanvas actual por esta:
+  function getMergedCanvas() {
+    const c = document.createElement('canvas'); 
+    c.width = dom.img.naturalWidth; 
+    c.height = dom.img.naturalHeight; 
+    const ctx = c.getContext('2d');
+    
+    // Si el espejo está activo, volteamos el canvas antes de dibujar
+    if (state.isMirror) {
+      ctx.translate(c.width, 0);
+      ctx.scale(-1, 1);
+    }
+
+    if (state.isOutline) {
+      ctx.drawImage(dom.outlineCanvas, 0, 0); // Exporta solo líneas
+    } else {
+      if(state.isGray) ctx.filter = 'grayscale(100%)'; 
+      ctx.drawImage(dom.img, 0, 0); // Exporta imagen normal
+      ctx.filter = 'none';
+    }
+    
+    if(state.isGridVisible) {
+      const divs = parseInt(dom.gridDivs.value); 
+      ctx.strokeStyle = dom.gridColor.value; 
+      ctx.lineWidth = parseInt(dom.gridThick.value) * (Math.max(c.width, c.height) / 1000);
+      ctx.beginPath(); const sX = c.width/divs, sY = c.height/divs;
+      for (let i = 1; i < divs; i++) { ctx.moveTo(i*sX,0); ctx.lineTo(i*sX,c.height); ctx.moveTo(0,i*sY); ctx.lineTo(c.width,i*sY); }
+      ctx.stroke(); ctx.strokeRect(0,0,c.width, c.height);
+    }
+    return c;
+  }
+
+    dom.btnPng.onclick = () => { if(!dom.img.src) return; const l = document.createElement('a'); l.download = 'guia_oleo.png'; l.href = getMergedCanvas().toDataURL(); l.click(); };
+    dom.btnPdf.onclick = () => { if(!dom.img.src) return; const { jsPDF } = window.jspdf; const isL = dom.img.naturalWidth > dom.img.naturalHeight; const doc = new jsPDF({ orientation: isL?'l':'p', unit:'mm' }); const m = 10; const ratio = dom.img.naturalWidth/dom.img.naturalHeight; let fw = doc.internal.pageSize.getWidth()-(m*2), fh = fw/ratio; if(fh > doc.internal.pageSize.getHeight()-(m*2)) { fh = doc.internal.pageSize.getHeight()-(m*2); fw = fh*ratio; } doc.addImage(getMergedCanvas().toDataURL('image/jpeg',0.85), 'JPEG', m, m, fw, fh); doc.save('guia_oleo.pdf'); };
+
+    function rgbToHsl(r,g,b){ r/=255; g/=255; b/=255; const max=Math.max(r,g,b), min=Math.min(r,g,b); let h, s, l=(max+min)/2; if(max==min) h=s=0; else { const d=max-min; s=l>0.5?d/(2-max-min):d/(max+min); switch(max){ case r: h=(g-b)/d+(g<b?6:0); break; case g: h=(b-r)/d+2; break; case b: h=(r-g)/d+4; break; } h*=60; } return {h, s:s*100, l:l*100}; }
+</script>
+</body>
+</html>
