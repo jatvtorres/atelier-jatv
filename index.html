@@ -59,8 +59,6 @@
             .left-panel { grid-row: 2; }
             .right-panel { grid-row: 3; }
             header { flex-direction: column; text-align: center; }
-            /* Esta es la regla que oculta la rueda solo en celulares: */
-            .wheel-desktop { display: none !important; }
         }
 
         /* PANELES */
@@ -211,7 +209,7 @@
             <div class="panel-header">Color & Asistente</div>
             <div class="content-box" style="display: flex; flex-direction: column; height: calc(100% - 53px); padding-bottom: 5px;">
                 
-                <div class="wheel-desktop" style="text-align: center;">
+                <div style="display: none;">
                     <canvas id="wheelCanvas" width="200" height="200" style="border-radius: 50%;"></canvas>
                 </div>
 
