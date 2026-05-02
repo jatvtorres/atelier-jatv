@@ -59,6 +59,8 @@
             .left-panel { grid-row: 2; }
             .right-panel { grid-row: 3; }
             header { flex-direction: column; text-align: center; }
+            /* Esta es la regla que oculta la rueda solo en celulares: */
+            .wheel-desktop { display: none !important; }
         }
 
         /* PANELES */
@@ -209,7 +211,7 @@
             <div class="panel-header">Color & Asistente</div>
             <div class="content-box" style="display: flex; flex-direction: column; height: calc(100% - 53px); padding-bottom: 5px;">
                 
-                <div style="text-align: center; display: none;">
+                <div class="wheel-desktop" style="text-align: center;">
                     <canvas id="wheelCanvas" width="200" height="200" style="border-radius: 50%;"></canvas>
                 </div>
 
@@ -278,14 +280,14 @@
         { name: "Winsor Red (W&N)", r:230, g:25, b:43 },
         { name: "Winsor Blue (W&N)", r:0, g:33, b:71 },
         { name: "Winsor Yellow (W&N)", r:255, g:215, b:0 },
-        { name: "French Ultramarine (W&N)", r:20, g:30, b:160 }, // Más cálido que el ultramar estándar
-        { name: "Sombra Natural / Raw Umber (W&N)", r:80, g:60, b:40 }, // Marrón oscuro verdoso
+        { name: "French Ultramarine (W&N)", r:20, g:30, b:160 }, 
+        { name: "Sombra Natural / Raw Umber (W&N)", r:80, g:60, b:40 }, 
         { name: "Yellow Ochre Pale (W&N)", r:220, g:175, b:80 },
         { name: "Verde Oliva / Olive Green (W&N)", r:85, g:107, b:47 },
         { name: "Rojo Indio / Indian Red (W&N)", r:205, g:92, b:92 },
         { name: "Rojo Veneciano / Venetian Red", r:200, g:8, b:21 },
-        { name: "Negro de Humo / Lamp Black (W&N)", r:20, g:20, b:20 }, // Más frío y cubriente que el marfil
-        { name: "Flake White / Blanco Cremnitz", r:240, g:235, b:225 } // Cálido, ligeramente traslúcido
+        { name: "Negro de Humo / Lamp Black (W&N)", r:20, g:20, b:20 }, 
+        { name: "Flake White / Blanco Cremnitz", r:240, g:235, b:225 } 
     ];
 
     const dom = {
@@ -332,26 +334,21 @@
     dom.btnSendChat.onclick = () => handleChat();
     dom.chatInput.onkeypress = (e) => { if(e.key === 'Enter') handleChat(); };
 
-    // --- CORRECCIÓN: BOTÓN CONSULTAR AHORA ES UN INTERRUPTOR (TOGGLE) ---
     function activateChat(colorName, r, g, b, btnElement) {
-        // 1. Quitar la clase active de todos los botones chat
         document.querySelectorAll('.btn-chat').forEach(b => b.classList.remove('active'));
 
-        // 2. Si el chat está abierto y tocamos el mismo color, lo cerramos
         if (state.activeColorContext && state.activeColorContext.name === colorName && dom.chatSection.style.display === 'block') {
             dom.chatSection.style.display = 'none';
             state.activeColorContext = null;
             return; 
         }
 
-        // 3. Si tocamos un color nuevo, abrimos el chat y marcamos el botón
         if(btnElement) btnElement.classList.add('active');
         state.activeColorContext = { name: colorName, r, g, b };
         dom.chatSection.style.display = 'block';
-        dom.chatDisplay.innerHTML = ''; // Limpiamos el chat
+        dom.chatDisplay.innerHTML = ''; 
         addBotMessage(`Hablemos del color detectado: <strong>${colorName}</strong>.<br>¿Qué tubo tienes a mano para intentar conseguirlo? (Ej: escribe "Raw Sienna" o "Ocre")`);
         
-        // Hacer scroll hacia abajo para que el chat se vea bien en celulares
         dom.chatSection.scrollIntoView({ behavior: 'smooth', block: 'end' });
         dom.chatInput.focus();
     }
@@ -460,7 +457,7 @@
         state.activeHighlight = null; clearHighlight(); state.scale = 1; state.pointX = 0; state.pointY = 0; dom.zoomRange.value = 1;
         state.isGray = false; dom.img.style.filter = "none";
         dom.chatSection.style.display = 'none';
-        dom.viewport.style.height = '100%'; // Reset height
+        dom.viewport.style.height = '100%'; 
     };
 
     dom.zoomRange.oninput = (e) => { state.scale = parseFloat(e.target.value); updateTransform(); };
