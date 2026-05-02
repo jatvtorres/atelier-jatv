@@ -47,7 +47,7 @@
         /* LAYOUT */
         .workspace {
             display: grid;
-            grid-template-columns: 300px 1fr 340px; /* Panel derecho un poco más ancho para el chat */
+            grid-template-columns: 300px 1fr 340px; 
             gap: 20px; padding: 20px; align-items: start;
             height: calc(100vh - 90px); min-height: 600px;
         }
@@ -55,7 +55,7 @@
         @media (max-width: 1200px) {
             .workspace { grid-template-columns: 1fr; height: auto; }
             .panel { margin-bottom: 20px; }
-            .canvas-area { grid-row: 1; height: 500px; }
+            .canvas-area { grid-row: 1; min-height: 300px; height: auto; }
             .left-panel { grid-row: 2; }
             .right-panel { grid-row: 3; }
             header { flex-direction: column; text-align: center; }
@@ -94,6 +94,7 @@
         .btn-sm { font-size: 0.75rem; padding: 6px 10px; border: 1px solid #555; background: transparent; color: #ccc; flex: 1; }
         .btn-sm:hover { background: #444; color: white; }
         .btn-locate.active { background: var(--accent-gold); color: black; border-color: var(--accent-gold); }
+        .btn-chat.active { background: #4a90e2; color: white; border-color: #4a90e2; }
         .btn-chat { border-color: #4a90e2; color: #4a90e2; }
         .btn-chat:hover { background: #4a90e2; color: white; }
 
@@ -101,7 +102,7 @@
         .canvas-area {
             background: #0a0a0a; height: 100%; border-radius: 8px; border: 1px solid var(--border);
             position: relative; overflow: hidden; display: flex; justify-content: center; align-items: center;
-            cursor: grab; box-shadow: inset 0 0 50px rgba(0,0,0,0.5);
+            cursor: grab; box-shadow: inset 0 0 50px rgba(0,0,0,0.5); transition: height 0.3s ease;
         }
         .canvas-area:active { cursor: grabbing; }
         #transformContainer { position: relative; transform-origin: center center; transition: transform 0.1s linear; }
@@ -112,10 +113,6 @@
         .placeholder i { font-size: 4em; display: block; margin-bottom: 15px; opacity: 0.3; }
 
         /* RESULTADOS Y CHAT */
-        .wheel-container {
-            display: flex; justify-content: center; margin-bottom: 20px; background: #111; padding: 15px; border-radius: 50%;
-            width: 200px; height: 200px; margin: 0 auto 15px auto; border: 2px solid #333;
-        }
         .analysis-card {
             background: rgba(255,255,255,0.05); border-left: 4px solid var(--accent-gold); padding: 12px; margin-bottom: 12px; border-radius: 0 6px 6px 0;
         }
@@ -123,10 +120,10 @@
         .swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); }
         .recipe-block { background: rgba(0,0,0,0.3); padding: 8px; border-radius: 4px; margin-top: 5px; border: 1px dashed #444; font-size: 0.85rem; color: #ddd;}
 
-        /* NUEVO: CHAT INTERFACE */
+        /* CHAT INTERFACE */
         .chat-section {
-            margin-top: 20px; border-top: 1px solid var(--border); padding-top: 15px;
-            background: var(--chat-bg); border-radius: 8px; padding: 15px;
+            margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px;
+            background: var(--chat-bg); border-radius: 8px; padding: 15px; flex-shrink: 0;
         }
         .chat-display {
             height: 150px; overflow-y: auto; background: #111; border: 1px solid #333; border-radius: 4px; padding: 10px; margin-bottom: 10px;
@@ -210,13 +207,14 @@
 
         <div class="panel right-panel">
             <div class="panel-header">Color & Asistente</div>
-            <div class="content-box">
-                <div style="text-align: center;">
+            <div class="content-box" style="display: flex; flex-direction: column; height: calc(100% - 53px); padding-bottom: 5px;">
+                
+                <div style="text-align: center; display: none;">
                     <canvas id="wheelCanvas" width="200" height="200" style="border-radius: 50%;"></canvas>
                 </div>
 
-                <div id="analysisResults" style="margin-top: 20px; max-height: 300px; overflow-y: auto; padding-right: 5px;">
-                    <p style="text-align: center; color: #666; font-size: 0.9em;">Esperando imagen...</p>
+                <div id="analysisResults" style="flex: 1; overflow-y: auto; padding-right: 5px;">
+                    <p style="text-align: center; color: #666; font-size: 0.9em; margin-top: 20px;">Esperando imagen...</p>
                 </div>
 
                 <div class="chat-section" id="chatSection" style="display:none;">
@@ -238,45 +236,56 @@
 <script>
     // --- BASE DE DATOS DE PIGMENTOS CON SUS VALORES ---
     const OIL_PAINTS = [
+        // Tradicionales y Genéricos
         { name: "Blanco Titanio", r:250, g:250, b:250 }, 
         { name: "Negro Marfil", r:30, g:30, b:30 },
         { name: "Amarillo Cadmio", r:255, g:230, b:0 }, 
         { name: "Ocre Amarillo", r:204, g:153, b:51 },
         { name: "Siena Natural", r:200, g:120, b:60 },
-        { name: "Raw Sienna", r:199, g:116, b:52 }, // Sinonimo ingles
+        { name: "Raw Sienna", r:199, g:116, b:52 }, 
         { name: "Rojo Cadmio", r:227, g:0, b:34 }, 
         { name: "Carmesí Alizarina", r:145, g:30, b:50 },
         { name: "Azul Ultramar", r:18, g:10, b:143 }, 
         { name: "Azul Cobalto", r:0, g:71, b:171 },
         { name: "Azul Cerúleo", r:42, g:82, b:190 },
         { name: "Siena Tostada", r:105, g:60, b:40 }, 
-        { name: "Burnt Sienna", r:105, g:60, b:40 }, // Sinonimo ingles
+        { name: "Burnt Sienna", r:105, g:60, b:40 }, 
         { name: "Sombra Tostada", r:50, g:30, b:20 },
-        { name: "Burnt Umber", r:50, g:30, b:20 }, // Sinonimo ingles
+        { name: "Burnt Umber", r:50, g:30, b:20 }, 
         { name: "Verde Vejiga", r:80, g:120, b:40 }, 
         { name: "Verde Viridian", r:0, g:100, b:60 },
         { name: "Tierra Verde", r:90, g:110, b:80 },
         { name: "Naranja Cadmio", r:255, g:140, b:0 },
-        // --- ADICIONES: MARIE'S Y HUILE (Pébéo/Lefranc) ---
-        { name: "Blanco de Zinc", r:245, g:245, b:250 }, // Más transparente y frío que el titanio
-        { name: "Amarillo Limón", r:255, g:240, b:0 }, // Muy común en sets de Marie's
-        { name: "Amarillo Nápoles", r:250, g:218, b:94 }, // Clásico de Huile
-        { name: "Bermellón", r:227, g:66, b:52 }, // Vermilion, clásico de Marie's
-        { name: "Rosa Madder", r:227, g:38, b:54 }, // Rose Madder / Laca Rosa
-        { name: "Magenta Primario", r:255, g:0, b:144 }, // Tonos CMYK modernos
-        { name: "Cian Primario", r:0, g:174, b:239 }, // Tonos CMYK modernos
-        { name: "Azul Ftalocianina", r:0, g:15, b:137 }, // Phthalo Blue
-        { name: "Azul de Prusia", r:0, g:49, b:83 }, // Prussian Blue (Muy oscuro y dominante)
-        { name: "Violeta Dioxazina", r:88, g:42, b:114 }, // Muy común en Pébéo Huile
-        { name: "Gris de Payne", r:83, g:104, b:120 }, // Payne's Gray
-        { name: "Verde Esmeralda", r:80, g:200, b:120 }, // Emerald Green de Marie's
-        { name: "Marrón Vandyke", r:65, g:53, b:32 }, // Vandyke Brown
-        { name: "Tono Piel", r:255, g:204, b:153 }, // Flesh Tint
-        { name: "Negro de Marte", r:40, g:36, b:34 }, // Mars Black (Más cálido que el marfil)
-        { name: "Sap Green", r:80, g:120, b:40 }, 
-        { name: "Ultramarine Blue", r:18, g:10, b:143 }, 
-        { name: "Chinese White", r:245, g:245, b:250 }, 
-        { name: "Yellow Pale", r:255, g:245, b:150 }
+        
+        // MARIE'S / HUILE / ESTUDIO
+        { name: "Blanco de Zinc", r:245, g:245, b:250 }, 
+        { name: "Amarillo Limón", r:255, g:240, b:0 }, 
+        { name: "Amarillo Nápoles", r:250, g:218, b:94 }, 
+        { name: "Bermellón", r:227, g:66, b:52 }, 
+        { name: "Rosa Madder", r:227, g:38, b:54 }, 
+        { name: "Magenta Primario", r:255, g:0, b:144 }, 
+        { name: "Cian Primario", r:0, g:174, b:239 }, 
+        { name: "Azul Ftalocianina", r:0, g:15, b:137 }, 
+        { name: "Azul de Prusia", r:0, g:49, b:83 }, 
+        { name: "Violeta Dioxazina", r:88, g:42, b:114 }, 
+        { name: "Gris de Payne", r:83, g:104, b:120 }, 
+        { name: "Verde Esmeralda", r:80, g:200, b:120 }, 
+        { name: "Marrón Vandyke", r:65, g:53, b:32 }, 
+        { name: "Tono Piel", r:255, g:204, b:153 }, 
+        { name: "Negro de Marte", r:40, g:36, b:34 }, 
+
+        // WINSOR & NEWTON (Winton & Artist's Oil)
+        { name: "Winsor Red (W&N)", r:230, g:25, b:43 },
+        { name: "Winsor Blue (W&N)", r:0, g:33, b:71 },
+        { name: "Winsor Yellow (W&N)", r:255, g:215, b:0 },
+        { name: "French Ultramarine (W&N)", r:20, g:30, b:160 }, // Más cálido que el ultramar estándar
+        { name: "Sombra Natural / Raw Umber (W&N)", r:80, g:60, b:40 }, // Marrón oscuro verdoso
+        { name: "Yellow Ochre Pale (W&N)", r:220, g:175, b:80 },
+        { name: "Verde Oliva / Olive Green (W&N)", r:85, g:107, b:47 },
+        { name: "Rojo Indio / Indian Red (W&N)", r:205, g:92, b:92 },
+        { name: "Rojo Veneciano / Venetian Red", r:200, g:8, b:21 },
+        { name: "Negro de Humo / Lamp Black (W&N)", r:20, g:20, b:20 }, // Más frío y cubriente que el marfil
+        { name: "Flake White / Blanco Cremnitz", r:240, g:235, b:225 } // Cálido, ligeramente traslúcido
     ];
 
     const dom = {
@@ -302,7 +311,6 @@
         outlineCanvas: document.getElementById('outlineOverlay'),
         btnOutline: document.getElementById('btnToggleOutline'),
         btnMirror: document.getElementById('btnToggleMirror'),
-        // CHAT DOM
         chatSection: document.getElementById('chatSection'),
         chatDisplay: document.getElementById('chatDisplay'),
         chatInput: document.getElementById('chatInput'),
@@ -314,22 +322,37 @@
         scale: 1, panning: false, pointX: 0, pointY: 0, startX: 0, startY: 0,
         isGridVisible: true, isGray: false,
         activeHighlight: null,
-        activeColorContext: null // Guardará el color sobre el que el usuario quiere preguntar
+        activeColorContext: null
     };
 
-    // --- SETUP INICIAL ---
     drawColorWheel([]); 
     dom.fileInput.onchange = (e) => loadFile(e.target.files[0]);
     [dom.gridDivs, dom.gridColor, dom.gridThick].forEach(el => el.oninput = drawGrid);
 
-    // --- CHAT LOGIC ---
     dom.btnSendChat.onclick = () => handleChat();
     dom.chatInput.onkeypress = (e) => { if(e.key === 'Enter') handleChat(); };
 
-    function activateChat(colorName, r, g, b) {
+    // --- CORRECCIÓN: BOTÓN CONSULTAR AHORA ES UN INTERRUPTOR (TOGGLE) ---
+    function activateChat(colorName, r, g, b, btnElement) {
+        // 1. Quitar la clase active de todos los botones chat
+        document.querySelectorAll('.btn-chat').forEach(b => b.classList.remove('active'));
+
+        // 2. Si el chat está abierto y tocamos el mismo color, lo cerramos
+        if (state.activeColorContext && state.activeColorContext.name === colorName && dom.chatSection.style.display === 'block') {
+            dom.chatSection.style.display = 'none';
+            state.activeColorContext = null;
+            return; 
+        }
+
+        // 3. Si tocamos un color nuevo, abrimos el chat y marcamos el botón
+        if(btnElement) btnElement.classList.add('active');
         state.activeColorContext = { name: colorName, r, g, b };
         dom.chatSection.style.display = 'block';
+        dom.chatDisplay.innerHTML = ''; // Limpiamos el chat
         addBotMessage(`Hablemos del color detectado: <strong>${colorName}</strong>.<br>¿Qué tubo tienes a mano para intentar conseguirlo? (Ej: escribe "Raw Sienna" o "Ocre")`);
+        
+        // Hacer scroll hacia abajo para que el chat se vea bien en celulares
+        dom.chatSection.scrollIntoView({ behavior: 'smooth', block: 'end' });
         dom.chatInput.focus();
     }
 
@@ -345,12 +368,10 @@
             return;
         }
 
-        // INTELIGENCIA DE MEZCLA
-        // 1. Buscar si el usuario mencionó un color conocido
         const userTube = findTubeByName(text);
         
         if(!userTube) {
-            addBotMessage(`No reconozco el color "${text}" en mi base de datos de óleos estándar. Intenta con nombres comunes como "Ocre", "Siena", "Cadmio", "Ultramar".`);
+            addBotMessage(`No reconozco el color "${text}". Intenta con nombres como "Ocre", "Winsor", "Siena", "Ultramar".`);
         } else {
             compareAndAdvise(userTube, state.activeColorContext);
         }
@@ -362,69 +383,60 @@
     }
 
     function compareAndAdvise(userTube, targetColor) {
-     // Convertir ambos a HSL para comparar humanamente
         const userHSL = rgbToHsl(userTube.r, userTube.g, userTube.b);
         const targetHSL = rgbToHsl(targetColor.r, targetColor.g, targetColor.b);
 
         let pBase = 100, pWhite = 0, pDark = 0, pAdj = 0;
         let adjName = "";
 
-    // 1. Diferencia de Luz (L) -> Determina porcentaje de Blanco o Sombra/Negro
         const diffL = targetHSL.l - userHSL.l;
         if (diffL > 5) {
-        pWhite = Math.min(80, diffL * 1.5); // Escala para calcular cantidad de blanco
+            pWhite = Math.min(80, diffL * 1.5); 
         } else if (diffL < -5) {
-        pDark = Math.min(50, Math.abs(diffL) * 1.2); // Escala para oscurecer
+            pDark = Math.min(50, Math.abs(diffL) * 1.2); 
         }
 
-    // 2. Diferencia de Matiz (H) -> Determina si hay que virar el color
         let diffH = targetHSL.h - userHSL.h;
         if (diffH > 180) diffH -= 360;
-     if (diffH < -180) diffH += 360;
+        if (diffH < -180) diffH += 360;
 
         if (Math.abs(diffH) > 10) {
-        pAdj = Math.min(35, Math.abs(diffH) * 0.6); // Escala de ajuste de matiz
-        if (userHSL.h >= 30 && userHSL.h < 60) { // Amarillos/Ocre
-        adjName = diffH > 0 ? "Azul / Verde (para enfriar)" : "Rojo / Siena (para calentar)";
-        } else if (userHSL.h >= 0 && userHSL.h < 30) { // Rojos/Naranjas
-        adjName = diffH > 0 ? "Amarillo / Ocre" : "Azul (para agrisar/violáceo)";
-         } else {
-        adjName = diffH > 0 ? "Color adyacente (frío)" : "Color adyacente (cálido)";
+            pAdj = Math.min(35, Math.abs(diffH) * 0.6); 
+            if (userHSL.h >= 30 && userHSL.h < 60) { 
+                adjName = diffH > 0 ? "Azul / Verde (para enfriar)" : "Rojo / Siena (para calentar)";
+            } else if (userHSL.h >= 0 && userHSL.h < 30) { 
+                adjName = diffH > 0 ? "Amarillo / Ocre" : "Azul (para agrisar/violáceo)";
+            } else {
+                adjName = diffH > 0 ? "Color adyacente (frío)" : "Color adyacente (cálido)";
+            }
         }
-}
 
-    // 3. Calcular la Base restando los modificadores
-    pBase = Math.max(10, 100 - pWhite - pDark - pAdj); 
+        pBase = Math.max(10, 100 - pWhite - pDark - pAdj); 
 
-    // 4. Normalizar para que todo sume exactamente 100%
-    let total = pBase + pWhite + pDark + pAdj;
-    pBase = Math.round((pBase / total) * 100);
-    pWhite = Math.round((pWhite / total) * 100);
-    pDark = Math.round((pDark / total) * 100);
-    pAdj = Math.round((pAdj / total) * 100);
+        let total = pBase + pWhite + pDark + pAdj;
+        pBase = Math.round((pBase / total) * 100);
+        pWhite = Math.round((pWhite / total) * 100);
+        pDark = Math.round((pDark / total) * 100);
+        pAdj = Math.round((pAdj / total) * 100);
 
-    // Ajuste final por problemas de redondeo matemático
-    let sum = pBase + pWhite + pDark + pAdj;
-    if (sum !== 100) pBase += (100 - sum);
+        let sum = pBase + pWhite + pDark + pAdj;
+        if (sum !== 100) pBase += (100 - sum);
 
-    // 5. Construir la respuesta en HTML
-    let advice = `Para obtener <strong>${targetColor.name}</strong> a partir de tu <strong>${userTube.name}</strong>, intenta esta proporción:<br><br>`;
+        let advice = `Para obtener <strong>${targetColor.name}</strong> a partir de tu <strong>${userTube.name}</strong>, intenta esta proporción:<br><br>`;
+        advice += `<div style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 6px; border: 1px solid #444; font-size: 0.95rem;">`;
 
-    advice += `<div style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 6px; border: 1px solid #444; font-size: 0.95rem;">`;
-
-    if (pBase > 0) advice += `<div style="margin-bottom: 6px;">🎨 <strong>${pBase}%</strong> - ${userTube.name} (Base)</div>`;
-    if (pWhite > 0) advice += `<div style="margin-bottom: 6px;">⚪ <strong>${pWhite}%</strong> - Blanco Titanio</div>`;
-    if (pDark > 0) advice += `<div style="margin-bottom: 6px;">⚫ <strong>${pDark}%</strong> - Sombra Tostada o Negro</div>`;
-    if (pAdj > 0) advice += `<div style="margin-bottom: 6px;">🌈 <strong>${pAdj}%</strong> - ${adjName}</div>`;
- 
+        if (pBase > 0) advice += `<div style="margin-bottom: 6px;">🎨 <strong>${pBase}%</strong> - ${userTube.name} (Base)</div>`;
+        if (pWhite > 0) advice += `<div style="margin-bottom: 6px;">⚪ <strong>${pWhite}%</strong> - Blanco Titanio</div>`;
+        if (pDark > 0) advice += `<div style="margin-bottom: 6px;">⚫ <strong>${pDark}%</strong> - Sombra Tostada o Negro</div>`;
+        if (pAdj > 0) advice += `<div style="margin-bottom: 6px;">🌈 <strong>${pAdj}%</strong> - ${adjName}</div>`;
+    
         advice += `</div>`;
 
-    if (pBase >= 95) {
-    advice = `¡Son prácticamente el mismo color! Usa tu <strong>${userTube.name}</strong> puro directamente (100%).`;
+        if (pBase >= 95) {
+            advice = `¡Son prácticamente el mismo color! Usa tu <strong>${userTube.name}</strong> puro directamente (100%).`;
+        }
+        addBotMessage(advice);
     }
-
-    addBotMessage(advice);
-}
 
     function addBotMessage(html) {
         const d = document.createElement('div');
@@ -442,14 +454,13 @@
         dom.chatDisplay.scrollTop = dom.chatDisplay.scrollHeight;
     }
 
-
-    // --- FUNCTIONALITY CORE ---
     dom.btnClearApp.onclick = () => {
         dom.img.src = ""; dom.container.style.display = 'none'; dom.placeholder.style.display = 'block';
         dom.fileInput.value = ""; drawColorWheel([]); dom.results.innerHTML = '<p style="text-align: center; color: #666; font-size: 0.9em;">Esperando imagen...</p>';
         state.activeHighlight = null; clearHighlight(); state.scale = 1; state.pointX = 0; state.pointY = 0; dom.zoomRange.value = 1;
         state.isGray = false; dom.img.style.filter = "none";
-        dom.chatSection.style.display = 'none'; // Ocultar chat
+        dom.chatSection.style.display = 'none';
+        dom.viewport.style.height = '100%'; // Reset height
     };
 
     dom.zoomRange.oninput = (e) => { state.scale = parseFloat(e.target.value); updateTransform(); };
@@ -457,6 +468,7 @@
     dom.viewport.onmousedown = (e) => { e.preventDefault(); state.panning = true; state.startX = e.clientX - state.pointX; state.startY = e.clientY - state.pointY; dom.viewport.style.cursor = 'grabbing'; };
     window.onmousemove = (e) => { if(!state.panning) return; e.preventDefault(); state.pointX = e.clientX - state.startX; state.pointY = e.clientY - state.startY; updateTransform(); };
     window.onmouseup = () => { state.panning = false; dom.viewport.style.cursor = 'grab'; };
+    
     function updateTransform() { 
             if(dom.container.style.display !== 'none') {
                 const mirrorScale = state.isMirror ? -1 : 1;
@@ -470,10 +482,29 @@
         reader.onload = e => {
             dom.img.src = e.target.result;
             dom.img.onload = () => {
-                dom.placeholder.style.display = 'none'; dom.container.style.display = 'block';
-                [dom.gridCanvas, dom.highlightCanvas, dom.outlineCanvas].forEach(c => { c.width = dom.img.naturalWidth; c.height = dom.img.naturalHeight; c.style.width = dom.img.naturalWidth + 'px'; c.style.height = dom.img.naturalHeight + 'px'; });
-                fitToScreen(); drawGrid(); analyzeImage();
-                // Limpiar chat anterior
+                dom.placeholder.style.display = 'none'; 
+                dom.container.style.display = 'block';
+                
+                const ratio = dom.img.naturalWidth / dom.img.naturalHeight;
+                if (window.innerWidth <= 1200) {
+                    let calcHeight = dom.viewport.clientWidth / ratio;
+                    const maxHeight = window.innerHeight * 0.70; 
+                    dom.viewport.style.height = Math.min(calcHeight, maxHeight) + 'px';
+                } else {
+                    dom.viewport.style.height = '100%'; 
+                }
+
+                [dom.gridCanvas, dom.highlightCanvas, dom.outlineCanvas].forEach(c => { 
+                    c.width = dom.img.naturalWidth; 
+                    c.height = dom.img.naturalHeight; 
+                    c.style.width = dom.img.naturalWidth + 'px'; 
+                    c.style.height = dom.img.naturalHeight + 'px'; 
+                });
+                
+                fitToScreen(); 
+                drawGrid(); 
+                analyzeImage();
+                
                 dom.chatDisplay.innerHTML = '<div class="chat-msg bot">Hola, selecciona un color arriba y pregúntame cómo obtenerlo con tus tubos.</div>';
             };
         };
@@ -501,6 +532,7 @@
         for (let i = 1; i < divs; i++) { ctx.moveTo(i * (w/divs), 0); ctx.lineTo(i * (w/divs), h); ctx.moveTo(0, i * (h/divs)); ctx.lineTo(w, i * (h/divs)); }
         ctx.stroke(); ctx.strokeRect(0,0,w,h);
     }
+    
     dom.btnGrid.onclick = () => { state.isGridVisible = !state.isGridVisible; drawGrid(); };
     dom.btnGray.onclick = () => { state.isGray = !state.isGray; dom.img.style.filter = state.isGray ? "grayscale(100%)" : "none"; };
 
@@ -510,7 +542,6 @@
         const data = ctx.getImageData(0,0,c.width,c.height).data;
         const map = {}; const quantization = 15;
 
-        // 1. Escanear píxeles
         for(let i=0; i<data.length; i+=12) { 
             if(data[i+3]<128) continue;
             const r=Math.round(data[i]/quantization)*quantization; 
@@ -520,13 +551,10 @@
             
             if(!map[k]) map[k] = {r,g,b, count:0};
             
-            // NUEVO TRUCO: Darle más "puntos" a los colores vivos para que le ganen a la oscuridad
             const max = Math.max(r,g,b);
             const min = Math.min(r,g,b);
-            // Si el color tiene contraste entre sus canales (no es gris) y no es negro puro...
             const isColorful = (max - min) > 20 && max > 40; 
             
-            // Le damos 6 puntos a los colores vivos y solo 1 punto a las sombras/grises
             map[k].count += isColorful ? 6 : 1; 
         }
         
@@ -534,12 +562,10 @@
         const finalColors = [];
         const diversityThreshold = 65; 
 
-        // 2. Seleccionar los 6 mejores asegurando que sean diferentes entre sí
         for (let cand of candidates) {
             if (finalColors.length >= 6) break;
             let isDistinct = true;
             for (let existing of finalColors) {
-                // Usamos la fórmula Redmean aquí también para que no agrupe el verde oscuro con el negro
                 const rmean = (cand.r + existing.r) / 2;
                 const dR = cand.r - existing.r;
                 const dG = cand.g - existing.g;
@@ -593,7 +619,7 @@
                 <div class="recipe-block">${recipe}</div>
                 <div class="card-actions">
                     <button class="btn-sm btn-locate" onclick="toggleHighlight(${c.r},${c.g},${c.b}, this)">📍 Ubicar</button>
-                    <button class="btn-sm btn-chat" onclick="activateChat('${tube.name}', ${c.r}, ${c.g}, ${c.b})">💬 Consultar</button>
+                    <button class="btn-sm btn-chat" onclick="activateChat('${tube.name}', ${c.r}, ${c.g}, ${c.b}, this)">💬 Consultar</button>
                 </div>
             `;
             dom.results.appendChild(div);
@@ -620,40 +646,27 @@
     const targetData = ctx.createImageData(w, h); 
     const output = targetData.data;
     
-    // Calculamos la luz real del color que el usuario quiere ubicar
     const targetLuma = 0.299 * tr + 0.587 * tg + 0.114 * tb;
-    
-    // Valores por defecto (moderados, no gigantes como el 180 de antes)
     let tolerance = 85; 
-    let lumaLimit = 60; // Diferencia de luz máxima permitida
+    let lumaLimit = 60; 
 
-    // Si el color a buscar es una sombra profunda...
     if (targetLuma < 50) {
-        tolerance = 45; // Somos estrictos con el color
-        lumaLimit = 30; // ¡Y súper estrictos con la luz! No puede tocar zonas claras
+        tolerance = 45; 
+        lumaLimit = 30; 
     }
 
     for (let i = 0; i < data.length; i += 4) {
         const r = data[i], g = data[i+1], b = data[i+2];
-        
-        // 1. FILTRO DE LUZ RÁPIDO:
-        // Calculamos la luz del píxel actual de la imagen
         const pixelLuma = 0.299 * r + 0.587 * g + 0.114 * b;
-        // Si la luz del píxel es muy distinta a la luz de nuestro objetivo, lo ignoramos
+        
         if (Math.abs(targetLuma - pixelLuma) > lumaLimit) continue;
 
-        // 2. FÓRMULA DE COLOR: (Solo llega aquí si pasó la prueba de luz)
         const rmean = (tr + r) / 2;
-        const dR = tr - r;
-        const dG = tg - g;
-        const dB = tb - b;
+        const dR = tr - r; const dG = tg - g; const dB = tb - b;
         const dist = Math.sqrt((((512+rmean)*dR*dR)>>8) + 4*dG*dG + (((767-rmean)*dB*dB)>>8));
 
         if (dist < tolerance) { 
-            output[i] = 0; 
-            output[i+1] = 255; 
-            output[i+2] = 234; 
-            output[i+3] = 180; 
+            output[i] = 0; output[i+1] = 255; output[i+2] = 234; output[i+3] = 180; 
         }
     }
     ctx.putImageData(targetData, 0, 0);
@@ -675,7 +688,14 @@
 
     function getMergedCanvas() {
         const c = document.createElement('canvas'); c.width = dom.img.naturalWidth; c.height = dom.img.naturalHeight; const ctx = c.getContext('2d');
-        if(state.isGray) ctx.filter = 'grayscale(100%)'; ctx.drawImage(dom.img, 0, 0); ctx.filter = 'none';
+        if (state.isMirror) { ctx.translate(c.width, 0); ctx.scale(-1, 1); }
+        if (state.isOutline) {
+            ctx.drawImage(dom.outlineCanvas, 0, 0);
+        } else {
+            if(state.isGray) ctx.filter = 'grayscale(100%)'; 
+            ctx.drawImage(dom.img, 0, 0); 
+            ctx.filter = 'none';
+        }
         if(state.isGridVisible) {
             const divs = parseInt(dom.gridDivs.value); ctx.strokeStyle = dom.gridColor.value; ctx.lineWidth = parseInt(dom.gridThick.value) * (Math.max(c.width, c.height) / 1000);
             ctx.beginPath(); const sX = c.width/divs, sY = c.height/divs;
@@ -684,7 +704,7 @@
         }
         return c;
     }
-    // --- LÓGICA DE PLANTILLA (CONTORNOS) ---
+    
   function generateOutline() {
     const c = dom.outlineCanvas; const ctx = c.getContext('2d');
     const w = c.width; const h = c.height;
@@ -698,16 +718,11 @@
       return 0.299*temp[i] + 0.587*temp[i+1] + 0.114*temp[i+2];
     };
 
-    // Algoritmo de detección de bordes
     for(let y=0; y<h; y++) {
       for(let x=0; x<w; x++) {
-        const luma = getLuma(x,y);
-        const lumaR = getLuma(x+1, y);
-        const lumaB = getLuma(x, y+1);
-        
+        const luma = getLuma(x,y); const lumaR = getLuma(x+1, y); const lumaB = getLuma(x, y+1);
         const diff = Math.abs(luma - lumaR) + Math.abs(luma - lumaB);
-        const color = diff > 15 ? 0 : 255; // Blanco y Negro puro
-        
+        const color = diff > 15 ? 0 : 255; 
         const idx = (y*w + x)*4;
         data[idx] = color; data[idx+1] = color; data[idx+2] = color; data[idx+3] = 255;
       }
@@ -721,7 +736,7 @@
     dom.btnOutline.style.color = state.isOutline ? 'black' : 'white';
 
     if(state.isOutline) {
-      dom.img.style.opacity = '0'; // Ocultamos la foto original
+      dom.img.style.opacity = '0'; 
       dom.outlineCanvas.style.display = 'block';
       generateOutline();
     } else {
@@ -737,46 +752,15 @@
     updateTransform();
   };
 
-  // IMPORTANTE: Reemplazar tu función getMergedCanvas actual por esta:
-  function getMergedCanvas() {
-    const c = document.createElement('canvas'); 
-    c.width = dom.img.naturalWidth; 
-    c.height = dom.img.naturalHeight; 
-    const ctx = c.getContext('2d');
-    
-    // Si el espejo está activo, volteamos el canvas antes de dibujar
-    if (state.isMirror) {
-      ctx.translate(c.width, 0);
-      ctx.scale(-1, 1);
-    }
-
-    if (state.isOutline) {
-      ctx.drawImage(dom.outlineCanvas, 0, 0); // Exporta solo líneas
-    } else {
-      if(state.isGray) ctx.filter = 'grayscale(100%)'; 
-      ctx.drawImage(dom.img, 0, 0); // Exporta imagen normal
-      ctx.filter = 'none';
-    }
-    
-    if(state.isGridVisible) {
-      const divs = parseInt(dom.gridDivs.value); 
-      ctx.strokeStyle = dom.gridColor.value; 
-      ctx.lineWidth = parseInt(dom.gridThick.value) * (Math.max(c.width, c.height) / 1000);
-      ctx.beginPath(); const sX = c.width/divs, sY = c.height/divs;
-      for (let i = 1; i < divs; i++) { ctx.moveTo(i*sX,0); ctx.lineTo(i*sX,c.height); ctx.moveTo(0,i*sY); ctx.lineTo(c.width,i*sY); }
-      ctx.stroke(); ctx.strokeRect(0,0,c.width, c.height);
-    }
-    return c;
-  }
-
     dom.btnPng.onclick = () => { if(!dom.img.src) return; const l = document.createElement('a'); l.download = 'guia_oleo.png'; l.href = getMergedCanvas().toDataURL(); l.click(); };
     dom.btnPdf.onclick = () => { if(!dom.img.src) return; const { jsPDF } = window.jspdf; const isL = dom.img.naturalWidth > dom.img.naturalHeight; const doc = new jsPDF({ orientation: isL?'l':'p', unit:'mm' }); const m = 10; const ratio = dom.img.naturalWidth/dom.img.naturalHeight; let fw = doc.internal.pageSize.getWidth()-(m*2), fh = fw/ratio; if(fh > doc.internal.pageSize.getHeight()-(m*2)) { fh = doc.internal.pageSize.getHeight()-(m*2); fw = fh*ratio; } doc.addImage(getMergedCanvas().toDataURL('image/jpeg',0.85), 'JPEG', m, m, fw, fh); doc.save('guia_oleo.pdf'); };
 
     function rgbToHsl(r,g,b){ r/=255; g/=255; b/=255; const max=Math.max(r,g,b), min=Math.min(r,g,b); let h, s, l=(max+min)/2; if(max==min) h=s=0; else { const d=max-min; s=l>0.5?d/(2-max-min):d/(max+min); switch(max){ case r: h=(g-b)/d+(g<b?6:0); break; case g: h=(b-r)/d+2; break; case b: h=(r-g)/d+4; break; } h*=60; } return {h, s:s*100, l:l*100}; }
+    
     // --- REGISTRO DEL SERVICE WORKER (PWA) ---
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js')
+            navigator.serviceWorker.register('./sw.js')
                 .then(reg => console.log('Service Worker registrado con éxito.', reg))
                 .catch(err => console.error('Error al registrar el Service Worker.', err));
         });
