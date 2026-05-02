@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Atelier JATV - Simulador Master</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#151515">
+    <link rel="apple-touch-icon" href="icon-192.png">
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
@@ -770,6 +773,14 @@
     dom.btnPdf.onclick = () => { if(!dom.img.src) return; const { jsPDF } = window.jspdf; const isL = dom.img.naturalWidth > dom.img.naturalHeight; const doc = new jsPDF({ orientation: isL?'l':'p', unit:'mm' }); const m = 10; const ratio = dom.img.naturalWidth/dom.img.naturalHeight; let fw = doc.internal.pageSize.getWidth()-(m*2), fh = fw/ratio; if(fh > doc.internal.pageSize.getHeight()-(m*2)) { fh = doc.internal.pageSize.getHeight()-(m*2); fw = fh*ratio; } doc.addImage(getMergedCanvas().toDataURL('image/jpeg',0.85), 'JPEG', m, m, fw, fh); doc.save('guia_oleo.pdf'); };
 
     function rgbToHsl(r,g,b){ r/=255; g/=255; b/=255; const max=Math.max(r,g,b), min=Math.min(r,g,b); let h, s, l=(max+min)/2; if(max==min) h=s=0; else { const d=max-min; s=l>0.5?d/(2-max-min):d/(max+min); switch(max){ case r: h=(g-b)/d+(g<b?6:0); break; case g: h=(b-r)/d+2; break; case b: h=(r-g)/d+4; break; } h*=60; } return {h, s:s*100, l:l*100}; }
+    // --- REGISTRO DEL SERVICE WORKER (PWA) ---
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js')
+                .then(reg => console.log('Service Worker registrado con éxito.', reg))
+                .catch(err => console.error('Error al registrar el Service Worker.', err));
+        });
+    }
 </script>
 </body>
 </html>
